@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,9 +45,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             LotteryApp()
-            }
         }
     }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LotteryApp() {
@@ -55,13 +58,14 @@ fun LotteryApp() {
     var bankoInput2 by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var showBankoInputs by remember { mutableStateOf(false) }
-
+    var additionalSets by remember { mutableStateOf(1) }
     val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -126,9 +130,12 @@ fun LotteryApp() {
                 errorMessage = "Aynı sayıları girmeyiniz!"
             } else if (bankoList1.any { it > 49 } || bankoList2.any { it > 49 }) {
                 errorMessage = "Banko sayıları 49'dan büyük olamaz!"
-            } else {
+            } else if(bankoList1.any { it < 1 } || bankoList2.any { it < 1 }){
+                errorMessage= "Banko sayıları 1'den küçük olamaz!"
+            }
+            else {
                 bankoNumbers = (bankoList1 + bankoList2).filter { it in 1..49 }
-                randomNumbers = generateRandomNumbers(bankoNumbers)
+                randomNumbers = generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis())
                 focusManager.clearFocus()
             }
         }) {
@@ -147,6 +154,36 @@ fun LotteryApp() {
             Spacer(modifier = Modifier.height(8.dp))
             LotteryNumbers(randomNumbers)
         }
+        Button(onClick = {
+            additionalSets++
+            val newSet = generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis() + additionalSets)
+
+            // Eğer newSet'in boyutu 6'dan küçükse, doğrudan ekleyin.
+            // Eğer newSet'in boyutu 6 veya daha büyükse, ilk 6 elemanı alın.
+            randomNumbers = randomNumbers + if (newSet.size >= 6) newSet.subList(0, 6) else newSet
+        }) {
+            Text("Kolon Artır")
+        }
+
+        for (i in 2..additionalSets) {
+            if (randomNumbers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LotteryNumbers(generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis() + i))
+            }
+        }
+        Button(onClick = {
+            // Kolonları temizle
+            bankoNumbers = emptyList()
+            randomNumbers = emptyList()
+            additionalSets = 1
+            showBankoInputs = false
+            bankoInput1 = ""
+            bankoInput2 = ""
+        }) {
+            Text("Kolonları Temizle")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -208,7 +245,6 @@ fun LotteryNumbers(randomNumbers: List<Int>) {
     }
 }
 
-
 @Composable
 fun NumberChip(number: Int) {
     Card(
@@ -227,17 +263,20 @@ fun NumberChip(number: Int) {
     }
 }
 
-fun generateRandomNumbers(bankoNumbers: List<Int>): List<Int> {
-    val random = Random(System.currentTimeMillis())
+fun generateRandomNumbersWithBanko(bankoNumbers: List<Int>, seed: Long): List<Int> {
+    val random = Random(seed)
     val selectedNumbers = mutableListOf<Int>()
 
-    // Banko sayıları göz önüne alarak random sayıları üretme
-    while (selectedNumbers.size + bankoNumbers.size < 6) {
-        val randomNumber = random.nextInt(49)+1
-        if (!selectedNumbers.contains(randomNumber) && !bankoNumbers.contains(randomNumber)) {
+    // Banko sayıları rastgele seçilen 6'lı içinde olmalı
+    selectedNumbers.addAll(bankoNumbers)
+
+    // Rastgele sayıları belirleme
+    while (selectedNumbers.size < 6) {
+        val randomNumber = random.nextInt(49) + 1
+        if (!selectedNumbers.contains(randomNumber)) {
             selectedNumbers.add(randomNumber)
         }
     }
 
-    return (selectedNumbers + bankoNumbers).sorted()
+    return selectedNumbers.sorted()
 }
