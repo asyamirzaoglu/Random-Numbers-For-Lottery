@@ -3,16 +3,7 @@ package com.example.projedeneme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,25 +11,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.projedeneme.ui.theme.ProjedenemeTheme
 import java.util.Random
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,12 +37,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LotteryApp() {
     var bankoNumbers by remember { mutableStateOf(emptyList<Int>()) }
-    var randomNumbers by remember { mutableStateOf(emptyList<Int>()) }
     var bankoInput1 by remember { mutableStateOf("") }
     var bankoInput2 by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var showBankoInputs by remember { mutableStateOf(false) }
     var additionalSets by remember { mutableStateOf(1) }
+    var showLotteryNumbers by remember { mutableStateOf(false) }
+    var shouldUpdateLotteryNumbers by remember { mutableStateOf(false) }
+
     val focusManager = LocalFocusManager.current
 
     Column(
@@ -70,9 +56,19 @@ fun LotteryApp() {
         verticalArrangement = Arrangement.Center
     ) {
         // Uğurlu sayı var mı? mesajı
-        Text("Uğurlu sayınız var mı? Hemen banko sayı olarak belirleyin!")
-
+        Text(
+            text = "Uğurlu sayınız var mı? Hemen banko sayı olarak belirleyin!",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(vertical = 32.dp).align(Alignment.CenterHorizontally)
+        )
         // Banko sayı giriş alanları, sadece gösterildiği zaman
+        Button(onClick = {
+            showBankoInputs = !showBankoInputs
+        }) {
+            Text(if (showBankoInputs) "Banko Sayıları Gizle" else "Banko Sayı Belirle")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         if (showBankoInputs) {
             TextField(
                 value = bankoInput1,
@@ -88,7 +84,7 @@ fun LotteryApp() {
                 ),
                 singleLine = true
             )
-
+            Spacer(modifier = Modifier.height(16.dp))
             TextField(
                 value = bankoInput2,
                 onValueChange = { input ->
@@ -106,39 +102,55 @@ fun LotteryApp() {
 
             // Hata mesajını gösterme
             if (errorMessage.isNotEmpty()) {
-                Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = errorMessage,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.Red,
+                    modifier = Modifier.padding(top = 4.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Banko sayıları göster/gizle butonu
-        Button(onClick = {
-            showBankoInputs = !showBankoInputs
-        }) {
-            Text(if (showBankoInputs) "Banko Sayıları Gizle" else "Banko Sayı Belirle")
-        }
+        // Kolon sayısı giriş alanı
+        TextField(
+            value = additionalSets.toString(),
+            onValueChange = { input ->
+                additionalSets = input.toIntOrNull() ?: 1
+                shouldUpdateLotteryNumbers = false // Kolon sayısı değiştiğinde, butona basılmadan önce yeniden hesaplanması gerektiğini belirten bayrak
+            },
+            label = { Text("Kolon Sayısı") },
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            singleLine = true
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            // Banko sayıları ayıklama ve random sayıları üretme
-            val bankoList1 = bankoInput1.split(",").mapNotNull { it.trim().toIntOrNull() }
-            val bankoList2 = bankoInput2.split(",").mapNotNull { it.trim().toIntOrNull() }
+        Button(
+            onClick = {
+                if (additionalSets > 0) {
+                    showLotteryNumbers = true
+                    shouldUpdateLotteryNumbers = true // Butona basıldığında şanslı numaraların güncellenmesi gerektiğini belirten bayrak
+                    val bankoList1 = bankoInput1.split(",").mapNotNull { it.trim().toIntOrNull() }
+                    val bankoList2 = bankoInput2.split(",").mapNotNull { it.trim().toIntOrNull() }
 
-            if (hasDuplicateNumbers(bankoList1 + bankoList2)) {
-                errorMessage = "Aynı sayıları girmeyiniz!"
-            } else if (bankoList1.any { it > 49 } || bankoList2.any { it > 49 }) {
-                errorMessage = "Banko sayıları 49'dan büyük olamaz!"
-            } else if(bankoList1.any { it < 1 } || bankoList2.any { it < 1 }){
-                errorMessage= "Banko sayıları 1'den küçük olamaz!"
-            }
-            else {
-                bankoNumbers = (bankoList1 + bankoList2).filter { it in 1..49 }
-                randomNumbers = generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis())
-                focusManager.clearFocus()
-            }
-        }) {
+                    if (hasDuplicateNumbers(bankoList1 + bankoList2)) {
+                        errorMessage = "Aynı sayıları girmeyiniz!"
+                    } else if (bankoList1.any { it > 49 } || bankoList2.any { it > 49 }) {
+                        errorMessage = "Banko sayıları 49'dan büyük olamaz!"
+                    } else if (bankoList1.any { it < 1 } || bankoList2.any { it < 1 }) {
+                        errorMessage = "Banko sayıları 1'den küçük olamaz!"
+                    } else {
+                        bankoNumbers = (bankoList1 + bankoList2).filter { it in 1..49 }
+                        focusManager.clearFocus()
+                    }
+                }
+            },
+            enabled = additionalSets > 0
+        ) {
             Text("Şanslı Numaraları Göster")
         }
 
@@ -149,38 +161,12 @@ fun LotteryApp() {
             BankoNumbers(bankoNumbers)
         }
 
-        // Rastgele sayıları sadece belirlendiğinde göster
-        if (randomNumbers.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            LotteryNumbers(randomNumbers)
-        }
-        Button(onClick = {
-            additionalSets++
-            val newSet = generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis() + additionalSets)
-
-            // Eğer newSet'in boyutu 6'dan küçükse, doğrudan ekleyin.
-            // Eğer newSet'in boyutu 6 veya daha büyükse, ilk 6 elemanı alın.
-            randomNumbers = randomNumbers + if (newSet.size >= 6) newSet.subList(0, 6) else newSet
-        }) {
-            Text("Kolon Artır")
-        }
-
-        for (i in 2..additionalSets) {
-            if (randomNumbers.isNotEmpty()) {
+        // Rastgele sayıları gösterme
+        if (showLotteryNumbers && shouldUpdateLotteryNumbers) {
+            for (i in 1..additionalSets) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LotteryNumbers(generateRandomNumbersWithBanko(bankoNumbers, System.currentTimeMillis() + i))
             }
-        }
-        Button(onClick = {
-            // Kolonları temizle
-            bankoNumbers = emptyList()
-            randomNumbers = emptyList()
-            additionalSets = 1
-            showBankoInputs = false
-            bankoInput1 = ""
-            bankoInput2 = ""
-        }) {
-            Text("Kolonları Temizle")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -229,8 +215,6 @@ fun LotteryNumbers(randomNumbers: List<Int>) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Şanslı Sayılar:")
-        Spacer(modifier = Modifier.height(8.dp))
 
         Row(
             modifier = Modifier
